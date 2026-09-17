@@ -25,6 +25,7 @@ let draggedCardNode = null;
 let pointerDrag = null;
 let dragPlaceholder = null;
 let dragGhost = null;
+let activeFolderId = null;
 
 const boardEl = document.getElementById("board");
 const columnTemplate = document.getElementById("columnTemplate");
@@ -47,6 +48,9 @@ const folderList = document.getElementById("folderList");
 const fileList = document.getElementById("fileList");
 const storageUsage = document.getElementById("storageUsage");
 const storageUsageBar = document.getElementById("storageUsageBar");
+const folderContext = document.getElementById("folderContext");
+const folderBackBtn = document.getElementById("folderBackBtn");
+const currentFolderName = document.getElementById("currentFolderName");
 const authScreen = document.getElementById("authScreen");
 const appShell = document.getElementById("appShell");
 const authForm = document.getElementById("authForm");
@@ -75,6 +79,10 @@ fileInput.addEventListener("change", () => uploadFiles(fileInput.files));
 newFolderBtn.addEventListener("click", () => {
   folderForm.hidden = false;
   folderNameInput.focus();
+});
+folderBackBtn.addEventListener("click", () => {
+  activeFolderId = null;
+  refreshStoragePanel();
 });
 cancelFolderBtn.addEventListener("click", () => {
   folderForm.hidden = true;
@@ -225,7 +233,7 @@ async function uploadFiles(fileList) {
   const database = await openFileDatabase();
   const transaction = database.transaction("files", "readwrite");
   const store = transaction.objectStore("files");
-  [...fileList].forEach((file) => store.put({ id: uid(), name: file.name, type: file.type, size: file.size, updatedAt: Date.now(), blob: file }));
+  [...fileList].forEach((file) => store.put({ id: uid(), name: file.name, type: file.type, size: file.size, updatedAt: Date.now(), folderId: activeFolderId, blob: file }));
   transaction.oncomplete = () => {
     fileInput.value = "";
     refreshStoragePanel();
@@ -245,6 +253,22 @@ async function deleteStoredItem(storeName, id) {
   refreshStoragePanel();
 }
 
+async function deleteFolder(id) {
+  const files = await getStoredItems("files");
+  const database = await openFileDatabase();
+  const transaction = database.transaction(["files", "folders"], "readwrite");
+  const fileStore = transaction.objectStore("files");
+  files.filter((file) => file.folderId === id).forEach((file) => {
+    file.folderId = null;
+    fileStore.put(file);
+  });
+  transaction.objectStore("folders").delete(id);
+  transaction.oncomplete = () => {
+    if (activeFolderId === id) activeFolderId = null;
+    refreshStoragePanel();
+  };
+}
+
 async function downloadStoredFile(id) {
   const file = await databaseRequest("files", "readonly", (store) => store.get(id));
   const url = URL.createObjectURL(file.blob);
@@ -257,9 +281,20 @@ async function downloadStoredFile(id) {
 
 async function refreshStoragePanel() {
   const [files, folders] = await Promise.all([getStoredItems("files"), getStoredItems("folders")]);
-  folderList.innerHTML = folders.length ? folders.map((folder) => `<div class="stored-row"><span class="stored-icon">&#128193;</span><span class="stored-name">${escapeHtml(folder.name)}</span><button data-delete-folder="${folder.id}" aria-label="Delete ${escapeHtml(folder.name)}">&times;</button></div>`).join("") : "";
-  fileList.innerHTML = files.length ? files.map((file) => `<div class="stored-row"><span class="stored-icon">&#128196;</span><span class="stored-name"><strong>${escapeHtml(file.name)}</strong><small>${formatBytes(file.size)}</small></span><button data-download-file="${file.id}" aria-label="Download ${escapeHtml(file.name)}">&#8595;</button><button data-delete-file="${file.id}" aria-label="Delete ${escapeHtml(file.name)}">&times;</button></div>`).join("") : `<p class="empty-storage">Your saved files will appear here.</p>`;
-  folderList.querySelectorAll("[data-delete-folder]").forEach((button) => button.addEventListener("click", () => deleteStoredItem("folders", button.dataset.deleteFolder)));
+  const activeFolder = folders.find((folder) => folder.id === activeFolderId);
+  folderContext.hidden = !activeFolder;
+  currentFolderName.textContent = activeFolder ? activeFolder.name : "";
+  folderList.innerHTML = !activeFolder && folders.length ? folders.map((folder) => `<div class="stored-row folder-row" data-open-folder="${folder.id}"><span class="stored-icon">&#128193;</span><button class="folder-open" type="button" data-open-folder="${folder.id}">${escapeHtml(folder.name)}</button><button data-delete-folder="${folder.id}" aria-label="Delete ${escapeHtml(folder.name)}">&times;</button></div>`).join("") : "";
+  const visibleFiles = files.filter((file) => (file.folderId || null) === activeFolderId);
+  fileList.innerHTML = visibleFiles.length ? visibleFiles.map((file) => `<div class="stored-row"><span class="stored-icon">&#128196;</span><span class="stored-name"><strong>${escapeHtml(file.name)}</strong><small>${formatBytes(file.size)}</small></span><button data-download-file="${file.id}" aria-label="Download ${escapeHtml(file.name)}">&#8595;</button><button data-delete-file="${file.id}" aria-label="Delete ${escapeHtml(file.name)}">&times;</button></div>`).join("") : `<p class="empty-storage">${activeFolder ? "This folder is empty." : "Your saved files will appear here."}</p>`;
+  folderList.querySelectorAll("[data-open-folder]").forEach((button) => button.addEventListener("click", () => {
+    activeFolderId = button.dataset.openFolder;
+    refreshStoragePanel();
+  }));
+  folderList.querySelectorAll("[data-delete-folder]").forEach((button) => button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    deleteFolder(button.dataset.deleteFolder);
+  }));
   fileList.querySelectorAll("[data-download-file]").forEach((button) => button.addEventListener("click", () => downloadStoredFile(button.dataset.downloadFile)));
   fileList.querySelectorAll("[data-delete-file]").forEach((button) => button.addEventListener("click", () => deleteStoredItem("files", button.dataset.deleteFile)));
   updateStorageMeter(files);

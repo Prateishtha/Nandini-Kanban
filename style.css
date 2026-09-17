@@ -754,6 +754,26 @@ html[data-theme="dark"] .card:hover {
   margin-bottom: 18px;
 }
 
+.folder-context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.folder-context button {
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+
 .stored-row {
   min-width: 0;
   gap: 9px;
@@ -765,6 +785,27 @@ html[data-theme="dark"] .card:hover {
 
 .stored-icon {
   font-size: 18px;
+}
+
+.folder-open {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+}
+
+.folder-open:hover {
+  color: var(--accent);
 }
 
 .stored-name {
