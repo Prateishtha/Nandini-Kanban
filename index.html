@@ -19,11 +19,40 @@
       <input id="themeColor" type="color" value="#c35f43" aria-label="Choose theme color" />
     </label>
     <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false">Dark mode</button>
+    <button class="storage-toggle" id="storageToggle" type="button" aria-expanded="false">Files</button>
     <button class="add-column-btn" id="addColumnBtn" type="button">+ Column</button>
   </div>
 </header>
 
 <main class="board" id="board"></main>
+
+<aside class="storage-panel" id="storagePanel" aria-hidden="true">
+  <div class="storage-panel-header">
+    <div>
+      <p class="panel-kicker">Private workspace</p>
+      <h2>Files & folders</h2>
+    </div>
+    <button class="panel-close" id="storageClose" type="button" aria-label="Close files panel">&times;</button>
+  </div>
+  <p class="storage-note">Saved in this browser. Download important files for a portable backup.</p>
+  <div class="storage-actions">
+    <label class="upload-btn" for="fileInput">+ Upload files</label>
+    <input id="fileInput" type="file" multiple hidden />
+    <button class="new-folder-btn" id="newFolderBtn" type="button">+ Folder</button>
+  </div>
+  <form class="folder-form" id="folderForm" hidden>
+    <input id="folderNameInput" type="text" placeholder="Folder name" aria-label="Folder name" required />
+    <button type="submit">Create</button>
+    <button id="cancelFolderBtn" type="button" aria-label="Cancel folder creation">&times;</button>
+  </form>
+  <div class="storage-meter">
+    <div class="storage-meter-label"><span>Browser storage</span><span id="storageUsage">Checking...</span></div>
+    <div class="storage-meter-track"><span id="storageUsageBar"></span></div>
+  </div>
+  <div class="folder-list" id="folderList"></div>
+  <div class="file-list" id="fileList"></div>
+</aside>
+<div class="storage-backdrop" id="storageBackdrop"></div>
 
 <template id="cardTemplate">
   <article class="card" draggable="true">

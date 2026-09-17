@@ -1,6 +1,8 @@
 const STORAGE_KEY = "kanban-board-state";
 const THEME_KEY = "kanban-board-theme";
 const COLOR_KEY = "kanban-board-color";
+const FILE_DB_NAME = "kanban-board-files";
+const FILE_DB_VERSION = 1;
 
 const defaultState = {
   columns: [
@@ -27,10 +29,40 @@ const columnTemplate = document.getElementById("columnTemplate");
 const cardTemplate = document.getElementById("cardTemplate");
 const themeToggle = document.getElementById("themeToggle");
 const themeColor = document.getElementById("themeColor");
+const storagePanel = document.getElementById("storagePanel");
+const storageToggle = document.getElementById("storageToggle");
+const storageClose = document.getElementById("storageClose");
+const storageBackdrop = document.getElementById("storageBackdrop");
+const fileInput = document.getElementById("fileInput");
+const newFolderBtn = document.getElementById("newFolderBtn");
+const folderForm = document.getElementById("folderForm");
+const folderNameInput = document.getElementById("folderNameInput");
+const cancelFolderBtn = document.getElementById("cancelFolderBtn");
+const folderList = document.getElementById("folderList");
+const fileList = document.getElementById("fileList");
+const storageUsage = document.getElementById("storageUsage");
+const storageUsageBar = document.getElementById("storageUsageBar");
 
 document.addEventListener("pointermove", handlePointerMove);
 document.addEventListener("pointerup", handlePointerUp);
 document.addEventListener("pointercancel", handlePointerUp);
+
+storageToggle.addEventListener("click", () => setStoragePanel(true));
+storageClose.addEventListener("click", () => setStoragePanel(false));
+storageBackdrop.addEventListener("click", () => setStoragePanel(false));
+fileInput.addEventListener("change", () => uploadFiles(fileInput.files));
+newFolderBtn.addEventListener("click", () => {
+  folderForm.hidden = false;
+  folderNameInput.focus();
+});
+cancelFolderBtn.addEventListener("click", () => {
+  folderForm.hidden = true;
+  folderNameInput.value = "";
+});
+folderForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  createFolder(folderNameInput.value);
+});
 
 applyTheme(loadTheme());
 applyThemeColor(loadThemeColor());
@@ -55,6 +87,106 @@ document.getElementById("addColumnBtn").addEventListener("click", () => {
 });
 
 render();
+refreshStoragePanel();
+
+function setStoragePanel(isOpen) {
+  storagePanel.classList.toggle("is-open", isOpen);
+  storageBackdrop.classList.toggle("is-visible", isOpen);
+  storagePanel.setAttribute("aria-hidden", String(!isOpen));
+  storageToggle.setAttribute("aria-expanded", String(isOpen));
+}
+
+function openFileDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(FILE_DB_NAME, FILE_DB_VERSION);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains("files")) database.createObjectStore("files", { keyPath: "id" });
+      if (!database.objectStoreNames.contains("folders")) database.createObjectStore("folders", { keyPath: "id" });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function databaseRequest(storeName, mode, action) {
+  const database = await openFileDatabase();
+  return new Promise((resolve, reject) => {
+    const request = action(database.transaction(storeName, mode).objectStore(storeName));
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getStoredItems(storeName) {
+  return databaseRequest(storeName, "readonly", (store) => store.getAll());
+}
+
+async function uploadFiles(fileList) {
+  if (!fileList.length) return;
+  const database = await openFileDatabase();
+  const transaction = database.transaction("files", "readwrite");
+  const store = transaction.objectStore("files");
+  [...fileList].forEach((file) => store.put({ id: uid(), name: file.name, type: file.type, size: file.size, updatedAt: Date.now(), blob: file }));
+  transaction.oncomplete = () => {
+    fileInput.value = "";
+    refreshStoragePanel();
+  };
+}
+
+async function createFolder(name) {
+  if (!name || !name.trim()) return;
+  await databaseRequest("folders", "readwrite", (store) => store.put({ id: uid(), name: name.trim(), createdAt: Date.now() }));
+  folderForm.hidden = true;
+  folderNameInput.value = "";
+  refreshStoragePanel();
+}
+
+async function deleteStoredItem(storeName, id) {
+  await databaseRequest(storeName, "readwrite", (store) => store.delete(id));
+  refreshStoragePanel();
+}
+
+async function downloadStoredFile(id) {
+  const file = await databaseRequest("files", "readonly", (store) => store.get(id));
+  const url = URL.createObjectURL(file.blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = file.name;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function refreshStoragePanel() {
+  const [files, folders] = await Promise.all([getStoredItems("files"), getStoredItems("folders")]);
+  folderList.innerHTML = folders.length ? folders.map((folder) => `<div class="stored-row"><span class="stored-icon">&#128193;</span><span class="stored-name">${escapeHtml(folder.name)}</span><button data-delete-folder="${folder.id}" aria-label="Delete ${escapeHtml(folder.name)}">&times;</button></div>`).join("") : "";
+  fileList.innerHTML = files.length ? files.map((file) => `<div class="stored-row"><span class="stored-icon">&#128196;</span><span class="stored-name"><strong>${escapeHtml(file.name)}</strong><small>${formatBytes(file.size)}</small></span><button data-download-file="${file.id}" aria-label="Download ${escapeHtml(file.name)}">&#8595;</button><button data-delete-file="${file.id}" aria-label="Delete ${escapeHtml(file.name)}">&times;</button></div>`).join("") : `<p class="empty-storage">Your saved files will appear here.</p>`;
+  folderList.querySelectorAll("[data-delete-folder]").forEach((button) => button.addEventListener("click", () => deleteStoredItem("folders", button.dataset.deleteFolder)));
+  fileList.querySelectorAll("[data-download-file]").forEach((button) => button.addEventListener("click", () => downloadStoredFile(button.dataset.downloadFile)));
+  fileList.querySelectorAll("[data-delete-file]").forEach((button) => button.addEventListener("click", () => deleteStoredItem("files", button.dataset.deleteFile)));
+  updateStorageMeter(files);
+}
+
+async function updateStorageMeter(files) {
+  if (!navigator.storage?.estimate) return;
+  const estimate = await navigator.storage.estimate();
+  const used = estimate.usage || files.reduce((total, file) => total + file.size, 0);
+  const quota = estimate.quota || 1;
+  const percentage = Math.min(100, Math.round((used / quota) * 100));
+  storageUsage.textContent = `${formatBytes(used)} used`;
+  storageUsageBar.style.width = `${Math.max(2, percentage)}%`;
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / (1024 ** index)).toFixed(index ? 1 : 0)} ${units[index]}`;
+}
+
+function escapeHtml(value) {
+  return value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
+}
 
 function applyTheme(theme) {
   const isDark = theme === "dark";
