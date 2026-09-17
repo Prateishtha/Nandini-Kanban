@@ -8,6 +8,28 @@
 </head>
 <body>
 
+<section class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <p class="panel-kicker">Your workspace</p>
+    <h1>Keep momentum visible.</h1>
+    <p class="auth-copy">Sign in to your private board and keep your work organized in one calm place.</p>
+    <div class="auth-tabs" role="tablist">
+      <button class="auth-tab is-active" id="loginTab" type="button">Log in</button>
+      <button class="auth-tab" id="signupTab" type="button">Create account</button>
+    </div>
+    <form class="auth-form" id="authForm">
+      <label class="name-field" hidden>Full name<input id="authName" type="text" autocomplete="name" /></label>
+      <label>Email<input id="authEmail" type="email" autocomplete="email" required /></label>
+      <label>Password<input id="authPassword" type="password" autocomplete="current-password" minlength="8" required /></label>
+      <p class="auth-error" id="authError" role="alert"></p>
+      <button class="auth-submit" type="submit" id="authSubmit">Log in</button>
+    </form>
+    <p class="auth-disclaimer">Demo account data stays in this browser. Connect a backend before using real customer accounts.</p>
+  </div>
+</section>
+
+<div class="app-shell" id="appShell" hidden>
+
 <header class="topbar">
   <div class="topbar-text">
     <h1>Board</h1>
@@ -19,7 +41,11 @@
       <input id="themeColor" type="color" value="#c35f43" aria-label="Choose theme color" />
     </label>
     <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false">Dark mode</button>
-    <button class="storage-toggle" id="storageToggle" type="button" aria-expanded="false">Files</button>
+    <button class="menu-toggle" id="menuToggle" type="button" aria-expanded="false" aria-label="Open workspace menu">&middot;&middot;&middot;</button>
+    <div class="workspace-menu" id="workspaceMenu" hidden>
+      <button class="menu-item" id="storageToggle" type="button">Files & folders</button>
+      <button class="menu-item" id="logoutBtn" type="button">Log out</button>
+    </div>
     <button class="add-column-btn" id="addColumnBtn" type="button">+ Column</button>
   </div>
 </header>
@@ -46,7 +72,7 @@
     <button id="cancelFolderBtn" type="button" aria-label="Cancel folder creation">&times;</button>
   </form>
   <div class="storage-meter">
-    <div class="storage-meter-label"><span>Browser storage</span><span id="storageUsage">Checking...</span></div>
+    <div class="storage-meter-label"><span>40 GB workspace plan</span><span id="storageUsage">Checking...</span></div>
     <div class="storage-meter-track"><span id="storageUsageBar"></span></div>
   </div>
   <div class="folder-list" id="folderList"></div>
@@ -72,6 +98,8 @@
     <button class="add-card-btn" type="button">+ Add card</button>
   </section>
 </template>
+
+</div>
 
 <script src="script.js"></script>
 </body>

@@ -3,6 +3,8 @@ const THEME_KEY = "kanban-board-theme";
 const COLOR_KEY = "kanban-board-color";
 const FILE_DB_NAME = "kanban-board-files";
 const FILE_DB_VERSION = 1;
+const ACCOUNT_KEY = "kanban-board-account";
+const SESSION_KEY = "kanban-board-session";
 
 const defaultState = {
   columns: [
@@ -31,6 +33,9 @@ const themeToggle = document.getElementById("themeToggle");
 const themeColor = document.getElementById("themeColor");
 const storagePanel = document.getElementById("storagePanel");
 const storageToggle = document.getElementById("storageToggle");
+const menuToggle = document.getElementById("menuToggle");
+const workspaceMenu = document.getElementById("workspaceMenu");
+const logoutBtn = document.getElementById("logoutBtn");
 const storageClose = document.getElementById("storageClose");
 const storageBackdrop = document.getElementById("storageBackdrop");
 const fileInput = document.getElementById("fileInput");
@@ -42,12 +47,28 @@ const folderList = document.getElementById("folderList");
 const fileList = document.getElementById("fileList");
 const storageUsage = document.getElementById("storageUsage");
 const storageUsageBar = document.getElementById("storageUsageBar");
+const authScreen = document.getElementById("authScreen");
+const appShell = document.getElementById("appShell");
+const authForm = document.getElementById("authForm");
+const authName = document.getElementById("authName");
+const authEmail = document.getElementById("authEmail");
+const authPassword = document.getElementById("authPassword");
+const authError = document.getElementById("authError");
+const authSubmit = document.getElementById("authSubmit");
+const loginTab = document.getElementById("loginTab");
+const signupTab = document.getElementById("signupTab");
+let authMode = "login";
 
 document.addEventListener("pointermove", handlePointerMove);
 document.addEventListener("pointerup", handlePointerUp);
 document.addEventListener("pointercancel", handlePointerUp);
 
 storageToggle.addEventListener("click", () => setStoragePanel(true));
+menuToggle.addEventListener("click", () => {
+  workspaceMenu.hidden = !workspaceMenu.hidden;
+  menuToggle.setAttribute("aria-expanded", String(!workspaceMenu.hidden));
+});
+logoutBtn.addEventListener("click", logout);
 storageClose.addEventListener("click", () => setStoragePanel(false));
 storageBackdrop.addEventListener("click", () => setStoragePanel(false));
 fileInput.addEventListener("change", () => uploadFiles(fileInput.files));
@@ -88,12 +109,89 @@ document.getElementById("addColumnBtn").addEventListener("click", () => {
 
 render();
 refreshStoragePanel();
+initializeAuth();
+
+loginTab.addEventListener("click", () => setAuthMode("login"));
+signupTab.addEventListener("click", () => setAuthMode("signup"));
+authForm.addEventListener("submit", handleAuthSubmit);
+
+function initializeAuth() {
+  const session = loadJson(SESSION_KEY);
+  authScreen.hidden = Boolean(session);
+  appShell.hidden = !session;
+  setAuthMode("login");
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  const signup = mode === "signup";
+  loginTab.classList.toggle("is-active", !signup);
+  signupTab.classList.toggle("is-active", signup);
+  authName.parentElement.hidden = !signup;
+  authName.required = signup;
+  authPassword.autocomplete = signup ? "new-password" : "current-password";
+  authSubmit.textContent = signup ? "Create account" : "Log in";
+  authError.textContent = "";
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  authError.textContent = "";
+  const email = authEmail.value.trim().toLowerCase();
+  const passwordHash = await hashPassword(authPassword.value);
+  const account = loadJson(ACCOUNT_KEY);
+  if (authMode === "signup") {
+    if (account) {
+      authError.textContent = "An account already exists in this browser. Log in instead.";
+      return;
+    }
+    saveJson(ACCOUNT_KEY, { name: authName.value.trim(), email, passwordHash });
+  } else if (!account || account.email !== email || account.passwordHash !== passwordHash) {
+    authError.textContent = "That email or password does not match this browser account.";
+    return;
+  }
+  saveJson(SESSION_KEY, { email, name: authMode === "signup" ? authName.value.trim() : account.name });
+  authScreen.hidden = true;
+  appShell.hidden = false;
+  authForm.reset();
+}
+
+function logout() {
+  localStorage.removeItem(SESSION_KEY);
+  setStoragePanel(false);
+  workspaceMenu.hidden = true;
+  authScreen.hidden = false;
+  appShell.hidden = true;
+  setAuthMode("login");
+}
+
+function loadJson(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key));
+  } catch (err) {
+    return null;
+  }
+}
+
+function saveJson(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+async function hashPassword(password) {
+  const data = new TextEncoder().encode(password);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
 function setStoragePanel(isOpen) {
   storagePanel.classList.toggle("is-open", isOpen);
   storageBackdrop.classList.toggle("is-visible", isOpen);
   storagePanel.setAttribute("aria-hidden", String(!isOpen));
   storageToggle.setAttribute("aria-expanded", String(isOpen));
+  if (isOpen) {
+    workspaceMenu.hidden = true;
+    menuToggle.setAttribute("aria-expanded", "false");
+  }
 }
 
 function openFileDatabase() {
