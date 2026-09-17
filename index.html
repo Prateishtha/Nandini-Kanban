@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Board</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-text">
+    <h1>Board</h1>
+    <p class="tagline">Keep momentum visible. Rename columns, drag cards between stages, and capture quick notes without getting buried in settings.</p>
+  </div>
+  <div class="topbar-actions">
+    <label class="theme-picker" for="themeColor">
+      <span>Theme color</span>
+      <input id="themeColor" type="color" value="#c35f43" aria-label="Choose theme color" />
+    </label>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false">Dark mode</button>
+    <button class="add-column-btn" id="addColumnBtn" type="button">+ Column</button>
+  </div>
+</header>
+
+<main class="board" id="board"></main>
+
+<template id="cardTemplate">
+  <article class="card" draggable="true">
+    <p class="card-text"></p>
+    <button class="card-delete" type="button" aria-label="Delete card">&times;</button>
+  </article>
+</template>
+
+<template id="columnTemplate">
+  <section class="column">
+    <div class="column-header">
+      <input class="column-title" type="text" />
+      <span class="column-count">0</span>
+      <button class="column-delete" type="button" aria-label="Delete column">&times;</button>
+    </div>
+    <div class="card-list"></div>
+    <button class="add-card-btn" type="button">+ Add card</button>
+  </section>
+</template>
+
+<script src="script.js"></script>
+</body>
+</html>
